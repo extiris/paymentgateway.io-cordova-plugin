@@ -1,0 +1,18 @@
+{
+  "name": "PaymentGateway.IO",
+  "version": "1.0.0",
+  "description": "PaymentGateway.IO helps you gain access to the payment gateways to accept cards and payments online. ================",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "PaymentGateway.IO",
+  "license": "Apache 2.0",
+  "keywords": [
+    "payment",
+    "gateway",
+    "accept",
+    "credit",
+    "cards"
+  ]
+}
