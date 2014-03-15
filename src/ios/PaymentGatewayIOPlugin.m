@@ -1,9 +1,24 @@
-//
-//  PaymentGatewayIOPlugin.m
-//
-//  Copyright 2005-2014 Merchant Paid, LLC
-//  Extiris, LLC License
-//
+////////////////////////////////////////////////////////////////////////////////
+/**
+ *
+ * @author 		Merchant Paid, LLC
+ * @copyright 	Copyright (c) 2012-2014 Merchant Paid, LLC. All rights reserved.
+ * @license 	http://paymentgateway.io/license
+ * @version 	v1.0.1
+ *
+ * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESSED OR IMPLIED WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * EXTIRIS CORPORATION OR ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+ * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ */
+////////////////////////////////////////////////////////////////////////////////
 
 #import "PaymentGatewayIOPlugin.h"
 
@@ -13,12 +28,7 @@
 
 @interface PaymentGatewayIOPlugin()
 
-    @property (nonatomic, copy, readwrite) NSString *sApiUrl; 
-    @property (nonatomic, copy, readwrite) NSString *sApiKey; //[ 73585071-df1e-2814-09be-87f6cb94419c
     @property (nonatomic, copy, readwrite) NSString *sJsCallbackId;
-
-    - (void)sendSuccessTo:(NSString *)callbackId withObject:(id)objwithObject;
-    - (void)sendFailureTo:(NSString *)callbackId;
 
 @end
 
@@ -30,185 +40,49 @@
 
 
     //----------------------------------------------------------------------
-    // [api_key (0)]
+    // attempt to handle json rpc requests to pg.io service
     //----------------------------------------------------------------------
-    -(void)init: (CDVInvokedUrlCommand *)command
+    -(void)JsonRpc: (CDVInvokedUrlCommand *)command
     {
-        NSString *sParam = [command.arguments objectAtIndex:0];
-        
-        self.sApiKey = (sParam) ? sParam : @"";
-        self.sApiUrl = @"https://www.merchantpaid.com/api/payments/1.0/json/MakePayment";
-    }
+        //////////[ HANDLE JS PARAMS ]/////////
 
-    
-    
-    //----------------------------------------------------------------------
-    //   [card_info (0), amount (1), customer_id (2), options (3), gateway (4) ]
-    //----------------------------------------------------------------------
-    -(void)pay: (CDVInvokedUrlCommand *)command
-    {
-        @try
-        {
-            //[ PROGRESS: show
-            [UIApplication sharedApplication].networkActivityIndicatorVisible = YES;
-            
-            
-            //[ SESSION: used later for callback
-            self.sJsCallbackId = command.callbackId;
-            
-            
-            //////////[ HANDLE JS PARAMS ]/////////
-            
-            //[ CARD INFO
-            NSDictionary* dJsCardInfo = [command.arguments objectAtIndex:0];
-            
-            //[ AMOUNT
-            NSString *sJsAmount = [command.arguments objectAtIndex:1];
-            sJsAmount = (sJsAmount) ? sJsAmount : @"";
-            
-            //[ CUSTOMER ID
-            NSString *sJsCustomerId = [command.arguments objectAtIndex:2];
-            sJsCustomerId = (sJsCustomerId) ? sJsCustomerId : @"";
-            
-            //[ OPTIONS
-            NSDictionary* dJsOptions = [command.arguments objectAtIndex:3];
-            
-            //[ GATEWAY
-            NSString *sJsGateway = [command.arguments objectAtIndex:4];
-            sJsGateway = (sJsGateway) ? sJsGateway : @"";
-            
-            
-            
-            //////////[ DATA VALIDATION ]/////////
-            
-            
-            //[ TODO: minor data validation to ensure we have all the fields?
-            NSError *error;
-            NSData *dJsonData = [NSJSONSerialization dataWithJSONObject: dJsCardInfo
-                                                                options: 0 //NSJSONWritingPrettyPrinted // or 0
-                                                                  error: &error];
-            
-            if( !dJsonData )
-            {
-                #ifdef DEBUG
-                    NSLog(@"Got an error: %@", error);
-                #endif
-                
-                //[ TODO: throw exception
-            }
-            
-            
-            //[ encode our json data
-            NSString *sJsonCardInfo = [[NSString alloc] initWithData:dJsonData encoding:NSUTF8StringEncoding];
-            
-            //[ OPTIONS: minor data validation to ensure we have all the fields?
-            NSError *error2;
-            NSData *dJsonOptionData = [NSJSONSerialization dataWithJSONObject: dJsOptions
-                                                                      options: 0 //NSJSONWritingPrettyPrinted // or 0
-                                                                        error: &error2];
-            if( !dJsonOptionData )
-            {
-                #ifdef DEBUG
-                    NSLog(@"Got an error: %@", error2);
-                #endif
-                
-                //[ TODO: throw exception
-            }
-            
-            //[ encode our json data
-            NSString *sJsonOptions = [[NSString alloc] initWithData:dJsonOptionData encoding:NSUTF8StringEncoding];
-            
-            
-            
-            //////////[ PROCESS FORM DATA ]/////////
-            
-            //[ FORM DATA
-            NSString *myFormData = [[NSString alloc] init];
-            
-            //[ NOTE: order matters
-            myFormData = [NSString stringWithFormat: @"card_info=%@&amount=%@&customer_id=%@&options=%@&gateway=%@", urlEncode(sJsonCardInfo), sJsAmount, sJsCustomerId, sJsonOptions, sJsGateway];
-            
-            //NSLog(@"FORM DATA: %@", myFormData);
-
-            
-            //////////[ HTTP: PREPARE REQUEST ]//////////
-            
-            NSMutableURLRequest *postRequest = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:self.sApiUrl]];
-            
-            
-            // HEADERS: Set the request's content type to application/x-www-form-urlencoded
-            [postRequest setValue:self.sApiKey forHTTPHeaderField:@"x-api-key"];
-            [postRequest setValue:@"application/x-www-form-urlencoded" forHTTPHeaderField:@"Content-Type"];
-            
-            // Designate the request a POST request and specify its body data
-            [postRequest setHTTPMethod:@"POST"];
-            [postRequest setHTTPBody:[NSData dataWithBytes:[myFormData UTF8String] length:strlen([myFormData UTF8String])]];
-            
-            
-            //////////[ SYNC: MAKE REQUEST ]//////////
-            
-            //[NSURLConnection sendSynchronousRequest:urlRequest queue:queue completionHandler:^(NSURLResponse *response, NSData *data, NSError *error)
-            
-            NSOperationQueue *queue = [[NSOperationQueue alloc] init];
+        //[ METHOD
+        NSString* sJsMethod = [command.arguments objectAtIndex:0];
+        sJsMethod = (sJsMethod) ? sJsMethod : @"";
         
-            
-            //////////[ ASYNC: MAKE REQUEST ]//////////
-            
-            [NSURLConnection sendAsynchronousRequest:postRequest queue:queue completionHandler:^(NSURLResponse *response, NSData *data, NSError *error)
-             {
-                 //[ need to decode
-                 NSString *sResponse = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-                 
-                 #ifdef DEBUG
-                    NSLog(@"[RESPONSE] =%@", sResponse);
-                 #endif
-                 
-                 //[ REFERENCE: CDVPlugin.h   -+>  stringByEvaluatingJavaScriptFromString
-                 if ([data length] > 0 && error == nil)
-                 {
-                     // [delegate receivedData:data];
-                     // [self sendSuccessTo:self.sJsCallbackId withObject:data];
-                     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:sResponse];
-                     
-                     // The sendPluginResult method is thread-safe.
-                     [self.commandDelegate sendPluginResult:pluginResult callbackId:self.sJsCallbackId];
-                 }
-                 else if ([data length] == 0 && error == nil)
-                 {
-                     // [delegate emptyReply];
-                 }
-                 // else if (error != nil && error.code == ERROR_CODE_TIMEOUT)
-                 // {
-                 // [delegate timedOut];
-                 // }
-                 else if (error != nil)
-                 {
-                     //[delegate downloadError:error];
-                     [self sendFailureTo:self.sJsCallbackId];
-                 }
-             }];
-            
-        }
-        @catch (NSException *exception)
-        {
-            //[ TODO: send exeception to UI
-            CDVPluginResult *result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:exception.reason];
-            
-            NSString *responseJavascript = [result toErrorCallbackString:command.callbackId];
-            
-            if( responseJavascript )
-                [self writeJavascript:responseJavascript];
-            
-            
-            #ifdef DEBUG
-                NSLog(@"PaymentGatewayIO Exception: %@", exception.reason);
-            #endif
-        }
-        @finally
-        {
-            //[ PROGRESS: hide
-            [UIApplication sharedApplication].networkActivityIndicatorVisible = NO;
-        }
+        
+        //[ GATEWAY
+        NSString* sJsGateway = [command.arguments objectAtIndex:1];
+        sJsGateway = (sJsGateway) ? sJsGateway : @"";
+        
+        //[ JS REQ ID
+        NSString *sJsReqId = [command.arguments objectAtIndex:2];
+        sJsReqId = (sJsReqId) ? sJsReqId : @"";
+        
+        //[ PARAMS
+        NSString *sJsParams = [command.arguments objectAtIndex:3];
+        sJsParams = (sJsParams) ? sJsParams : @"[]";
+        
+        
+        //////////[ FORM POST ]//////////
+        
+        HttpForm * form = [HttpForm alloc];
+        
+        [form addParam:@"jsonrpc" withValue:@"2.0"];
+        [form addParam:@"method" withValue:sJsMethod];
+        [form addParam:@"id" withValue:sJsReqId];
+        [form addParam:@"params" withValue:sJsParams];
+        
+
+        #if TARGET_IPHONE_SIMULATOR
+            NSString* sUrl = [NSString stringWithFormat:@"http://dev.paymentgateway.io/api/%@/1.0/jsonrpc", sJsGateway];
+        #else
+            NSString* sUrl = [NSString stringWithFormat:@"https://paymentgateway.io/api/%@/1.0/jsonrpc", sJsGateway];
+        #endif
+        
+        
+        //[ DO HTTP POST
+        [self httpPost: command.callbackId :sJsReqId :sUrl : form.getFormData :nil];
     }
 
     
@@ -216,71 +90,99 @@
 
 
     //----------------------------------------------------------------------
-    // INTERNAL: helper function: get the url encoded string form of an object
+    //
     //----------------------------------------------------------------------
-    static NSString *urlEncode(id object) {
-        return [[NSString stringWithFormat: @"%@", object] stringByAddingPercentEscapesUsingEncoding: NSUTF8StringEncoding];
-    }
-
-
-
-#pragma mark - Cordova callback helpers
-
-
-    //----------------------------------------------------------------------
-    // SUCCESS: call passed back to success js function
-    //----------------------------------------------------------------------
-    - (void)sendSuccessTo:(NSString *)callbackId withObject:(id)obj
+    - (void)httpPost: (NSString *)sCallbackId :(NSString *) sReqId :(NSString *) sUrl :(NSString *) sFormData :(NSDictionary *) dHeaders
     {
-        CDVPluginResult *result = nil;
-  
-        if( [obj isKindOfClass:[NSString class]] )
+        @try
         {
-            result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:obj];
-        }
-        else if( [obj isKindOfClass:[NSDictionary class]] )
-        {
-            result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:obj];
-        }
-        else if ([obj isKindOfClass:[NSNumber class]])
-        {
-            // all the numbers we return are bools
-            result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsInt:[obj intValue]];
-        }
-        else if(!obj)
-        {
-            result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-        }
-        else
-        {
-            NSLog(@"Success callback wrapper not yet implemented for class %@", [obj class]);
-        }
-  
-        NSString *responseJavascript = [result toSuccessCallbackString:callbackId];
-    
-        if( responseJavascript )
-        {
-            [self writeJavascript:responseJavascript];
-        }
-    }
+            //[ PROGRESS: show network progress
+            [UIApplication sharedApplication].networkActivityIndicatorVisible = YES;
+            
+            
+            //[ HTTP: prepare our request
+            NSMutableURLRequest *postRequest = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:sUrl]];
+            
+            // HEADERS: Set the request's content type to application/x-www-form-urlencoded
+            [postRequest setValue:@"application/x-www-form-urlencoded" forHTTPHeaderField:@"Content-Type"];
+            
+            // Designate the request a POST request and specify its body data
+            [postRequest setHTTPMethod:@"POST"];
+            [postRequest setHTTPBody:[NSData dataWithBytes:[sFormData UTF8String] length:strlen([sFormData UTF8String])]];
+            
+            
+            //////////[ ASYNC: MAKE REQUEST ]//////////
+            
+            NSOperationQueue *queue = [[NSOperationQueue alloc] init];
+            
+            [NSURLConnection sendAsynchronousRequest:postRequest queue:queue completionHandler:^(NSURLResponse *response, NSData *data, NSError *error)
+             {
+                 //[ go data?
+                 if( [data length] > 0 && error == nil )
+                 {
+                     //[ ASSERT: that we have json data
+                     if( [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:&error] != nil )
+                     {
+                         //[ JSON: attempt to decode data if json object
+                         NSData *dJsonData = [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:&error];
+                         
+                         if( dJsonData )
+                         {
+                             //[ SUCCESS
+                             NSMutableDictionary* dmJsonObject = [dJsonData mutableCopy];
 
-    
-    
-    //----------------------------------------------------------------------
-    // FAILED: call passed back to failure js function
-    //----------------------------------------------------------------------
-    - (void)sendFailureTo:(NSString *)callbackId
-    {
-        CDVPluginResult *result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
-
-        NSString *responseJavascript = [result toErrorCallbackString:callbackId];
-
-        if( responseJavascript )
+                             //[ CORDOVA: prepare our response
+                             CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:dmJsonObject];
+                             
+                             //[ send back to ui for js
+                             [self.commandDelegate sendPluginResult:pluginResult callbackId:sCallbackId];
+                         }
+                     }
+                     else
+                     {
+                         //[ JSON: need to decode
+                         NSString *sResponse = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+                         
+                         
+                         NSMutableDictionary *dmResponseObject = [[NSMutableDictionary alloc] initWithObjectsAndKeys:sResponse, @"response", nil];
+                         
+                         //[ ATTACH: our request id
+                         [dmResponseObject setObject:sReqId forKey:@"reqid"];
+                         
+                        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:dmResponseObject];
+                        
+                         //[ send back to ui for js
+                         [self.commandDelegate sendPluginResult:pluginResult callbackId:sCallbackId];
+                     }
+                 }
+                 else if ([data length] == 0 && error == nil)
+                 {
+                     // [delegate emptyReply];
+                 }
+                 else if (error != nil)
+                 {
+                     //[self sendFailureTo:sCallbackId];
+                 }
+             }];
+        }
+        @catch( NSException *exception )
         {
-            [self writeJavascript:responseJavascript];
+            NSLog(@"PaymentGatewayIO Exception: %@", exception.reason);
+
+
+            //[ send exeception to UI
+            CDVPluginResult *result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:exception.reason];
+            
+            NSString *responseJavascript = [result toErrorCallbackString:sCallbackId];
+            
+            if( responseJavascript )
+                [self writeJavascript:responseJavascript];
+        }
+        @finally
+        {
+            //[ PROGRESS: hide network progress
+            [UIApplication sharedApplication].networkActivityIndicatorVisible = NO;
         }
     }
 
 @end
-
-
